@@ -80,6 +80,7 @@
 
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
   .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .panel-head .ph-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
   .panel-head .t { font: 600 13px var(--sans); }
   .panel-head .who { font: 500 11px var(--mono); color: var(--muted); }
   .panel-body { padding: 4px 20px 16px; }
@@ -195,7 +196,8 @@ function md(src){
   closeList(); return html;
 }
 function download(name, text){ const b=new Blob([text],{type:'text/markdown'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
-function panel({title, who, body, actions}){ return `<div class="panel"><div class="panel-head"><span class="t">${title}</span>${who?`<span class="who">${who}</span>`:''}${actions||''}</div><div class="panel-body">${body}</div></div>`; }
+function lenHint(text){ const c=(text||'').length; return `~${Math.max(1,Math.ceil(c/4)).toLocaleString()} tok · ${c.toLocaleString()} ch`; }
+function panel({title, who, hint, body, actions}){ return `<div class="panel"><div class="panel-head"><div class="ph-left"><span class="t">${title}</span>${who?`<span class="who">${who}</span>`:''}${hint?`<span class="who">· ${hint}</span>`:''}</div>${actions||''}</div><div class="panel-body">${body}</div></div>`; }
 function actBtns(id){ return `<div class="acts"><button data-copy="${id}">Copy</button><button data-dl="${id}">Download .md</button></div>`; }
 
 // --- engine toggle ---
@@ -280,7 +282,7 @@ function renderDet(data){
   let tabs='<div class="tabs">'; let bodies='';
   data.artifacts.forEach((a,i)=>{ store[a.key]=a.markdown;
     tabs+=`<button data-tab="${a.key}" aria-pressed="${i===0}">${a.label}</button>`;
-    bodies+=`<div class="tabpane" data-pane="${a.key}" style="display:${i===0?'block':'none'}">${panel({title:a.label, who:'deterministic', body:`<div class="md">${md(a.markdown)}</div>`, actions:actBtns(a.key)})}</div>`;
+    bodies+=`<div class="tabpane" data-pane="${a.key}" style="display:${i===0?'block':'none'}">${panel({title:a.label, who:'deterministic', hint:lenHint(a.markdown), body:`<div class="md">${md(a.markdown)}</div>`, actions:actBtns(a.key)})}</div>`;
   });
   tabs+='</div>';
   out.innerHTML = `<div class="out-head"><span class="badge ok">Deterministic</span><span class="badge">spec_hash</span><span class="hash">${data.spec_hash}</span></div>${tabs}${bodies}`;
@@ -302,9 +304,9 @@ function renderAI(data){
     `<div class="out-head"><span class="badge ok">AI-assisted</span>`+
     `<span class="badge ${changed?'changed':'ok'}">${changed?'validator revised the draft':'validator approved as-is'}</span>`+
     `<span class="badge">draft: ${esc(data.models?.draft||'?')}</span><span class="badge">validate: ${esc(data.models?.validate||'?')}</span></div>`+
-    panel({title:'① Draft', who:'model A', body:`<div class="md">${md(data.draft)}</div>`, actions:actBtns('draft')})+
+    panel({title:'① Draft', who:'model A', hint:lenHint(data.draft), body:`<div class="md">${md(data.draft)}</div>`, actions:actBtns('draft')})+
     panel({title:'② Independent validation', who:'model B', body: issuesHtml})+
-    panel({title:'③ Final spec', who:'after review', body:`<div class="md">${md(data.final)}</div>`, actions:actBtns('final')});
+    panel({title:'③ Final spec', who:'after review', hint:lenHint(data.final), body:`<div class="md">${md(data.final)}</div>`, actions:actBtns('final')});
   wireActs();
 }
 </script>
