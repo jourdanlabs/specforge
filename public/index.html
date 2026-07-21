@@ -45,6 +45,11 @@
   textarea { min-height: 168px; resize: vertical; line-height: 1.55; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
   .charcount { text-align: right; color: var(--muted); font: 500 11px var(--mono); margin-top: 6px; }
+  .ghelp { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+  #guided-view .gfield { margin-bottom: 12px; }
+  #guided-view .gfield .label { margin-bottom: 6px; }
+  #guided-view textarea { min-height: 62px; }
+  .opt-tag { font: 500 10px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line2); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
 
   .seg { display: inline-flex; background: var(--code-bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 3px; }
   .seg button { font: 600 12px var(--sans); border: 0; background: transparent; color: var(--muted); padding: 7px 12px; border-radius: 6px; cursor: pointer; }
@@ -112,9 +117,29 @@
 
   <div class="grid">
     <section class="card">
-      <div class="label">Raw idea</div>
-      <textarea id="idea" placeholder="Dump the paragraph. e.g. I want a local-first app where a solo founder can describe an idea, get a build-ready spec, generate a deck outline, and hand the result to an AI coding agent without answering 40 questions first…"></textarea>
-      <div class="charcount"><span id="chars">0</span> chars</div>
+      <div class="seg" id="inseg" role="group" aria-label="input mode" style="margin-bottom:16px">
+        <button id="in-raw" aria-pressed="true">Raw idea</button>
+        <button id="in-guided" aria-pressed="false">Guided</button>
+      </div>
+
+      <div id="raw-view">
+        <div class="label">Raw idea</div>
+        <textarea id="idea" placeholder="Dump the paragraph. e.g. I want a local-first app where a solo founder can describe an idea, get a build-ready spec, generate a deck outline, and hand the result to an AI coding agent without answering 40 questions first…"></textarea>
+        <div class="charcount"><span id="chars">0</span> chars</div>
+      </div>
+
+      <div id="guided-view" style="display:none">
+        <p class="ghelp">Answer what you can — blanks become explicit assumptions. The more you fill in, the sharper the deterministic spec.</p>
+        <div class="gfield"><div class="label">What are you building?</div><input id="g-building" placeholder="one line — the product in a sentence" /></div>
+        <div class="gfield"><div class="label">Problem / why now</div><textarea id="g-problem" placeholder="what's broken today"></textarea></div>
+        <div class="gfield"><div class="label">Who is it for?</div><input id="g-users" placeholder="users / personas, comma-separated" /></div>
+        <div class="gfield"><div class="label">Core features / must-haves</div><textarea id="g-features" placeholder="one per line"></textarea></div>
+        <div class="gfield"><div class="label">Key data / entities</div><input id="g-entities" placeholder="the main nouns, comma-separated" /></div>
+        <div class="gfield"><div class="label">Constraints</div><textarea id="g-constraints" placeholder="security, performance, platform, offline, compliance…"></textarea></div>
+        <div class="gfield"><div class="label">Out of scope</div><input id="g-nongoals" placeholder="non-goals, comma-separated" /></div>
+        <div class="gfield"><div class="label">Success looks like <span class="opt-tag">optional</span></div><textarea id="g-success" placeholder="how you'll know it works"></textarea></div>
+      </div>
+
       <div class="row">
         <div><div class="label" style="margin-bottom:6px">Industry</div><input id="industry" placeholder="e.g. fintech" /></div>
         <div><div class="label" style="margin-bottom:6px">Project type</div><input id="type" placeholder="e.g. web app" /></div>
@@ -148,7 +173,7 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
-const state = { mode: 'deterministic', outputs: new Set(['full_spec', 'deck_outline', 'build_prompt']) };
+const state = { mode: 'deterministic', input_mode: 'raw', outputs: new Set(['full_spec', 'deck_outline', 'build_prompt']) };
 
 // --- tiny, safe markdown renderer (headings, bold, code, lists, blockquote) ---
 function esc(s){return s.replace(/[&<>]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
@@ -186,6 +211,17 @@ function setMode(m){
 $('#eng-det').onclick=()=>setMode('deterministic');
 $('#eng-ai').onclick=()=>setMode('ai');
 
+// --- input mode toggle (raw idea vs guided questionnaire) ---
+function setInput(m){
+  state.input_mode=m;
+  $('#in-raw').setAttribute('aria-pressed', m==='raw');
+  $('#in-guided').setAttribute('aria-pressed', m==='guided');
+  $('#raw-view').style.display = m==='raw' ? 'block' : 'none';
+  $('#guided-view').style.display = m==='guided' ? 'block' : 'none';
+}
+$('#in-raw').onclick=()=>setInput('raw');
+$('#in-guided').onclick=()=>setInput('guided');
+
 // --- outputs multi-select ---
 $('#opts').addEventListener('click',(e)=>{ const el=e.target.closest('.opt'); if(!el)return; const on=el.dataset.on!=='true'; el.dataset.on=on; const k=el.dataset.key; on?state.outputs.add(k):state.outputs.delete(k); });
 $('#idea').addEventListener('input',(e)=>{ $('#chars').textContent=e.target.value.length; });
@@ -201,15 +237,31 @@ fetch('/api/config').then(r=>r.json()).then(({ai_configured})=>{
 // --- generate ---
 let store = {};
 $('#go').onclick = async () => {
-  const idea = $('#idea').value.trim();
-  if(!idea){ $('#idea').focus(); return; }
+  const guided = state.input_mode === 'guided';
+  let idea = '', answers = null;
+  if (guided) {
+    answers = {
+      building: $('#g-building').value.trim(),
+      problem: $('#g-problem').value.trim(),
+      users: $('#g-users').value.trim(),
+      features: $('#g-features').value.trim(),
+      entities: $('#g-entities').value.trim(),
+      constraints: $('#g-constraints').value.trim(),
+      nongoals: $('#g-nongoals').value.trim(),
+      success: $('#g-success').value.trim(),
+    };
+    if (!Object.values(answers).some(Boolean)) { $('#g-building').focus(); return; }
+  } else {
+    idea = $('#idea').value.trim();
+    if(!idea){ $('#idea').focus(); return; }
+  }
   const outputs = [...state.outputs];
   if(!outputs.length){ outputs.push('full_spec'); }
   const btn=$('#go'); btn.disabled=true; btn.textContent = state.mode==='ai' ? 'Drafting → validating…' : 'Forging…';
   const out=$('#out'); out.className='show'; out.innerHTML='<div class="card">Working…</div>';
   try{
     const res = await fetch('/api/generate',{method:'POST',headers:{'content-type':'application/json'},
-      body: JSON.stringify({ mode: state.mode, idea, industry: $('#industry').value.trim(), type: $('#type').value.trim(), outputs })});
+      body: JSON.stringify({ mode: state.mode, input_mode: state.input_mode, idea, answers, industry: $('#industry').value.trim(), type: $('#type').value.trim(), outputs })});
     const data = await res.json();
     if(!res.ok || data.error) throw new Error(data.error || ('HTTP '+res.status));
     state.mode==='ai' ? renderAI(data) : renderDet(data);

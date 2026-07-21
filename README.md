@@ -2,7 +2,13 @@
 
 **Your idea is not a spec. Forge it into one** — reproducibly, or with two models checking each other.
 
-SpecForge turns a raw paragraph into build-ready artifacts (Full Spec, Deck Outline, AI Build Prompt, PRD) using one of two engines:
+SpecForge turns an idea into build-ready artifacts (Full Spec, Deck Outline, AI Build Prompt, PRD).
+
+**Two input modes** (toggle at the top, works with either engine):
+- **Raw idea** — dump a paragraph; the engine infers the structure.
+- **Guided** — a short questionnaire (what, problem, users, features, entities, constraints, non-goals, success). Blanks become explicit assumptions. Best for the deterministic engine, which turns your answers straight into spec sections instead of guessing from prose.
+
+**Two engines:**
 
 - **Deterministic** — rule-based. No model, no network. The same idea produces the **same spec and the same `spec_hash`**, every time. Regenerate it and hand it to an auditor.
 - **AI-assisted** — the two-model pattern: **one model drafts** the spec, then a **second, independent model reviews it**, names the gaps, and returns a revised version. You see all three: draft → validation → final.

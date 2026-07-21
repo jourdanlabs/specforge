@@ -7,7 +7,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 
-import { buildSpec } from './lib/deterministic.mjs';
+import { buildSpec, buildSpecFromAnswers } from './lib/deterministic.mjs';
 import { renderOutputs } from './lib/outputs.mjs';
 import { aiSpec, aiConfigured } from './lib/ai.mjs';
 
@@ -60,15 +60,23 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && req.url === '/api/generate') {
-      const { mode = 'deterministic', idea = '', industry = '', type = '', outputs = ['full_spec'] } = await readBody(req);
-      if (!String(idea).trim()) return send(res, 400, { error: 'idea is required' });
+      const { mode = 'deterministic', input_mode = 'raw', idea = '', answers = {}, industry = '', type = '', outputs = ['full_spec'] } = await readBody(req);
+      const guided = input_mode === 'guided';
+      const hasAnswers = answers && Object.values(answers).some((v) => String(v || '').trim());
+
+      // Require some input: an idea (raw) or at least one filled answer (guided).
+      if (guided ? !hasAnswers : !String(idea).trim()) {
+        return send(res, 400, { error: guided ? 'fill in at least one field' : 'idea is required' });
+      }
 
       if (mode === 'ai') {
-        const result = await aiSpec({ idea, industry, type, outputs });
+        const result = await aiSpec({ idea, answers: guided ? answers : null, industry, type, outputs });
         return send(res, 200, { mode: 'ai', ...result });
       }
 
-      const spec = buildSpec({ idea, industry, type });
+      const spec = guided
+        ? buildSpecFromAnswers({ ...answers, industry, type })
+        : buildSpec({ idea, industry, type });
       const artifacts = renderOutputs(spec, outputs);
       return send(res, 200, { mode: 'deterministic', spec_hash: spec.meta.spec_hash, artifacts });
     }
