@@ -1,0 +1,13 @@
+{
+  "name": "specforge",
+  "version": "1.0.0",
+  "description": "Turn a raw idea into a build-ready spec — deterministically, or with two models checking each other.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {}
+}
