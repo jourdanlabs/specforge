@@ -159,6 +159,7 @@
         <div class="opt" data-key="full_spec" data-on="true"><span class="dot"></span>Full Spec</div>
         <div class="opt" data-key="deck_outline" data-on="true"><span class="dot"></span>Deck Outline</div>
         <div class="opt" data-key="build_prompt" data-on="true"><span class="dot"></span>AI Build Prompt</div>
+        <div class="opt" data-key="engineered_prompt" data-on="true"><span class="dot"></span>Engineered Prompt</div>
         <div class="opt" data-key="prd" data-on="false"><span class="dot"></span>PRD</div>
       </div>
 
@@ -173,7 +174,7 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
-const state = { mode: 'deterministic', input_mode: 'raw', outputs: new Set(['full_spec', 'deck_outline', 'build_prompt']) };
+const state = { mode: 'deterministic', input_mode: 'raw', outputs: new Set(['full_spec', 'deck_outline', 'build_prompt', 'engineered_prompt']) };
 
 // --- tiny, safe markdown renderer (headings, bold, code, lists, blockquote) ---
 function esc(s){return s.replace(/[&<>]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
