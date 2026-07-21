@@ -24,13 +24,38 @@ Requires **Node 18+**. That's it — no `npm install`, no build step.
 
 ### Enable AI-assisted mode (optional)
 
+AI mode is off until you give it an endpoint. Three steps, all inside the `specforge` folder:
+
+**1. Create the config file**
+
 ```bash
 cp .env.example .env
-# edit .env — set MODEL_API_KEY and (optionally) MODEL_BASE_URL / model names
-node server.mjs
 ```
 
-`MODEL_BASE_URL` accepts **any OpenAI-compatible `/chat/completions` endpoint** — OpenAI, a compatible gateway in front of Azure OpenAI, a local server, or an internal corporate model gateway. Nothing is hard-coded to a vendor. For genuine independence, point `MODEL_DRAFT` and `MODEL_VALIDATE` at **two different models**.
+**2. Edit `.env`** (with `nano .env`, VS Code, or any editor) and fill in:
+
+```bash
+MODEL_BASE_URL=https://your-gateway/v1   # your approved endpoint
+MODEL_API_KEY=your-key-here              # the key/token for it
+MODEL_DRAFT=gpt-4o-mini                  # model that writes the draft
+MODEL_VALIDATE=gpt-4o-mini               # model that reviews it (use a DIFFERENT one for real independence)
+```
+
+Only `MODEL_BASE_URL` and `MODEL_API_KEY` are required to turn it on — everything else has defaults.
+
+**3. Restart the server** — press `Ctrl+C`, then `node server.mjs` again.
+
+You'll know it worked when the terminal prints `AI configured` (instead of `AI OFF`) and the pill in the top-right of the page reads **AI · configured**. Click the **✦ AI-assisted** toggle, then **Forge spec** — you'll get the Draft → Validation → Final panels.
+
+Your key lives only in `.env`, which is `.gitignore`d — it is never committed or pushed.
+
+#### Which endpoint?
+
+`MODEL_BASE_URL` accepts **any OpenAI-compatible `/chat/completions` endpoint**, called with a `Authorization: Bearer <key>` header. That covers OpenAI directly, most internal/corporate model gateways, and local servers (Ollama, LM Studio, vLLM). Point `MODEL_DRAFT` and `MODEL_VALIDATE` at **two different models** for genuine independence.
+
+- **OpenAI-compatible gateway** → works as-is; just set the base URL + key.
+- **Raw Azure OpenAI** (uses an `api-key` header, deployment names, and `?api-version=`) → not OpenAI-shaped; needs a small adapter. Open an issue / ask and it's a ~10-line add.
+- **AWS Bedrock** (SigV4-signed) → same — needs an adapter, not the Bearer shape.
 
 ---
 
