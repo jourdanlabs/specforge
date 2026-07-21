@@ -81,6 +81,27 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { mode: 'deterministic', spec_hash: spec.meta.spec_hash, artifacts });
     }
 
+    // Verify a receipt: re-derive the hash from the receipt's own input and check
+    // it against the claimed hash. Proves the spec is bound to its input — change
+    // one character and it no longer verifies. Deterministic only.
+    if (req.method === 'POST' && req.url === '/api/verify') {
+      let { receipt } = await readBody(req);
+      if (typeof receipt === 'string') {
+        try { receipt = JSON.parse(receipt); } catch { return send(res, 400, { error: 'receipt is not valid JSON' }); }
+      }
+      if (!receipt || typeof receipt !== 'object') return send(res, 400, { error: 'paste a receipt object' });
+      if (receipt.engine && receipt.engine !== 'deterministic') {
+        return send(res, 400, { error: 'only deterministic specs carry a verifiable receipt (AI output is not reproducible)' });
+      }
+      const claimed = String(receipt.spec_hash || '');
+      if (!claimed) return send(res, 400, { error: 'receipt has no spec_hash to verify against' });
+      const spec = receipt.input_mode === 'guided'
+        ? buildSpecFromAnswers({ ...(receipt.answers || {}), industry: receipt.industry, type: receipt.type })
+        : buildSpec({ idea: receipt.idea || '', industry: receipt.industry, type: receipt.type });
+      const recomputed = spec.meta.spec_hash;
+      return send(res, 200, { verified: recomputed === claimed, claimed_hash: claimed, recomputed_hash: recomputed });
+    }
+
     if (req.url.startsWith('/api/')) return send(res, 404, { error: 'unknown endpoint' });
     return serveStatic(req, res);
   } catch (e) {

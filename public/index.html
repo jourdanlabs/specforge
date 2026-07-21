@@ -170,6 +170,14 @@
 
   <section id="out"></section>
 
+  <section class="card" style="margin-top:22px">
+    <div class="label">Verify a receipt</div>
+    <p class="ghelp">Paste a receipt (the <strong>Copy receipt</strong> button on a deterministic result gives you one). SpecForge re-derives the hash from the receipt's own input — change one character of that input and it fails. Deterministic, offline.</p>
+    <textarea id="vrx" placeholder='{"tool":"specforge","engine":"deterministic","input_mode":"raw","idea":"…","spec_hash":"…"}'></textarea>
+    <div style="margin-top:10px"><button class="go" id="vbtn" style="width:auto;padding:12px 24px">Verify</button></div>
+    <div id="vout"></div>
+  </section>
+
   <footer>SpecForge · runs fully local · deterministic mode needs no network · <span id="foot-ai"></span></footer>
 </div>
 
@@ -239,6 +247,7 @@ fetch('/api/config').then(r=>r.json()).then(({ai_configured})=>{
 
 // --- generate ---
 let store = {};
+let lastInput = null;
 $('#go').onclick = async () => {
   const guided = state.input_mode === 'guided';
   let idea = '', answers = null;
@@ -260,6 +269,7 @@ $('#go').onclick = async () => {
   }
   const outputs = [...state.outputs];
   if(!outputs.length){ outputs.push('full_spec'); }
+  lastInput = { input_mode: state.input_mode, idea, answers, industry: $('#industry').value.trim(), type: $('#type').value.trim() };
   const btn=$('#go'); btn.disabled=true; btn.textContent = state.mode==='ai' ? 'Drafting → validating…' : 'Forging…';
   const out=$('#out'); out.className='show'; out.innerHTML='<div class="card">Working…</div>';
   try{
@@ -285,13 +295,35 @@ function renderDet(data){
     bodies+=`<div class="tabpane" data-pane="${a.key}" style="display:${i===0?'block':'none'}">${panel({title:a.label, who:'deterministic', hint:lenHint(a.markdown), body:`<div class="md">${md(a.markdown)}</div>`, actions:actBtns(a.key)})}</div>`;
   });
   tabs+='</div>';
-  out.innerHTML = `<div class="out-head"><span class="badge ok">Deterministic</span><span class="badge">spec_hash</span><span class="hash">${data.spec_hash}</span></div>${tabs}${bodies}`;
+  store.__receipt = JSON.stringify({ tool:'specforge', engine:'deterministic', input_mode:lastInput?.input_mode||'raw', idea:lastInput?.idea||'', answers:lastInput?.answers||null, industry:lastInput?.industry||'', type:lastInput?.type||'', spec_hash:data.spec_hash }, null, 2);
+  out.innerHTML = `<div class="out-head"><span class="badge ok">Deterministic</span><span class="badge">spec_hash</span><span class="hash">${data.spec_hash}</span><div class="acts"><button data-copy="__receipt">Copy receipt</button></div></div>${tabs}${bodies}`;
   out.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
     out.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-pressed', x===b));
     out.querySelectorAll('.tabpane').forEach(p=>p.style.display = p.dataset.pane===b.dataset.tab?'block':'none');
   });
   wireActs();
 }
+
+$('#vbtn').onclick = async () => {
+  const raw = $('#vrx').value.trim();
+  const vout = $('#vout');
+  if(!raw){ $('#vrx').focus(); return; }
+  vout.innerHTML='';
+  try{
+    let receipt; try{ receipt = JSON.parse(raw); }catch{ throw new Error('that is not valid JSON — paste the receipt from “Copy receipt”'); }
+    const res = await fetch('/api/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({receipt})});
+    const d = await res.json();
+    if(!res.ok || d.error) throw new Error(d.error || ('HTTP '+res.status));
+    const ok = d.verified;
+    const badStyle = 'color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)';
+    vout.innerHTML =
+      `<div class="out-head" style="margin-top:16px"><span class="badge ${ok?'ok':''}" style="${ok?'':badStyle}">${ok?'✓ VERIFIED':'✕ TAMPERED'}</span></div>`+
+      `<div class="panel"><div class="panel-body" style="padding:14px 20px"><div class="md">`+
+      `<p><strong>${ok?'The input still produces this hash.':'The input no longer produces this hash — it was changed.'}</strong></p>`+
+      `<p>claimed&nbsp;&nbsp;&nbsp;&nbsp;<code>${esc(d.claimed_hash)}</code><br>recomputed <code style="color:${ok?'var(--ok)':'var(--bad)'}">${esc(d.recomputed_hash)}</code></p>`+
+      `</div></div></div>`;
+  }catch(err){ vout.innerHTML = `<div class="card err" style="margin-top:14px">✕ ${err.message}</div>`; }
+};
 
 function renderAI(data){
   store={ final: data.final, draft: data.draft }; const out=$('#out');
